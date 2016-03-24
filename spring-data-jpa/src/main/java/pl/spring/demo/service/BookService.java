@@ -1,8 +1,8 @@
 package pl.spring.demo.service;
 
-import pl.spring.demo.to.BookTo;
-
 import java.util.List;
+
+import pl.spring.demo.to.BookTo;
 
 public interface BookService {
 

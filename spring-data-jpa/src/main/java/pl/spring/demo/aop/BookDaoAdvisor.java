@@ -1,35 +1,60 @@
 package pl.spring.demo.aop;
 
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
-import org.springframework.aop.MethodBeforeAdvice;
-import pl.spring.demo.annotation.NullableId;
+import pl.spring.demo.common.Sequence;
+import pl.spring.demo.dao.BookDao;
+import pl.spring.demo.entity.BookEntity;
 import pl.spring.demo.exception.BookNotNullIdException;
+import pl.spring.demo.mapper.BookMapper;
 import pl.spring.demo.to.IdAware;
 
-import java.lang.reflect.Method;
+@Aspect
+@Component
+public class BookDaoAdvisor {
 
-public class BookDaoAdvisor implements MethodBeforeAdvice {
+	@Autowired
+	private Sequence sequence;
 
-    @Override
-    public void before(Method method, Object[] objects, Object o) throws Throwable {
+	@Autowired
+	private BookDao bookDao;
 
-        if (hasAnnotation(method, o, NullableId.class)) {
-            checkNotNullId(objects[0]);
-        }
-    }
+	// -----------------------------------------------------
+	// PointCut -> Before methods
+	@Pointcut("execution(public pl.spring.demo.entity.BookEntity pl.spring.demo.dao.BookDao.save(pl.spring.demo.entity.BookEntity))")
+	public void pointCutSave() {
+	}
 
-    private void checkNotNullId(Object o) {
-        if (o instanceof IdAware && ((IdAware) o).getId() != null) {
-            throw new BookNotNullIdException();
-        }
-    }
+	@Pointcut("@annotation(pl.spring.demo.annotation.NullableId)")
+	public void pointCutNullableId() {
+	}
 
-    private boolean hasAnnotation (Method method, Object o, Class annotationClazz) throws NoSuchMethodException {
-        boolean hasAnnotation = method.getAnnotation(annotationClazz) != null;
+	// -----------------------------------------------------
+	
+	@Before("pointCutSave()")
+	public void beforeSave(JoinPoint join) {
+		BookEntity book = (BookEntity) join.getArgs()[0];
+		if (book.getId() == null) {
+			book.setId(sequence.nextValue(BookMapper.bookEntityConversionToBookTo(bookDao.findAll())));
+		}
+	}
 
-        if (!hasAnnotation && o != null) {
-            hasAnnotation = o.getClass().getMethod(method.getName(), method.getParameterTypes()).getAnnotation(annotationClazz) != null;
-        }
-        return hasAnnotation;
-    }
+	@Before("pointCutNullableId()")
+	public void beforeNullableId(JoinPoint join) {
+		checkNotNullId(join.getArgs()[0]);
+	}
+
+	// -----------------------------------------------------
+	
+	private void checkNotNullId(Object o) {
+		if (o instanceof IdAware && ((IdAware) o).getId() != null) {
+			throw new BookNotNullIdException();
+		}
+	}
+
 }
